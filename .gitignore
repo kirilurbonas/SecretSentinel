@@ -1,0 +1,44 @@
+### General
+bin/
+.DS_Store
+*.log
+*.tmp
+*.swp
+*.swo
+*.bak
+node_modules/
+dist/
+build/
+coverage/
+
+### Go
+cli/bin/
+cli/dist/
+cli/.cache/
+*.test
+*.out
+
+### Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+env/
+venv/
+.venv/
+
+### Node / JavaScript / TypeScript
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-store/
+*.tsbuildinfo
+
+### Editor / IDE
+.idea/
+.vscode/
+*.iml
+
+### Docker
+*.pid
