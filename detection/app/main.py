@@ -4,9 +4,9 @@ from fastapi import FastAPI
 
 from . import service
 from .models import (
+    BatchScanFileResult,
     BatchScanRequest,
     BatchScanResponse,
-    BatchScanFileResult,
     ScanRequest,
     ScanResponse,
 )

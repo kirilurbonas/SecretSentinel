@@ -408,7 +408,9 @@ def iter_rule_matches(rule: RegexRule, line: str) -> Iterable[str]:
         yield str(match)
 
 
-def filter_high_entropy(tokens: Iterable[str], min_entropy: float, min_length: int) -> Iterable[str]:
+def filter_high_entropy(
+    tokens: Iterable[str], min_entropy: float, min_length: int
+) -> Iterable[str]:
     for token in tokens:
         if len(token) < min_length:
             continue
