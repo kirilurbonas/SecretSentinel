@@ -71,6 +71,282 @@ GENERIC_HIGH_ENTROPY = RegexRule(
     base_confidence=0.7,
 )
 
+# Google
+GOOGLE_API_KEY = RegexRule(
+    id="google_api_key",
+    type="Google API Key",
+    pattern=re.compile(r"AIza[0-9A-Za-z_-]{35}"),
+    base_confidence=0.95,
+)
+GOOGLE_OAUTH = RegexRule(
+    id="google_oauth_secret",
+    type="Google OAuth Client Secret",
+    pattern=re.compile(r"(?i)client_secret[\"']?\s*[:=]\s*[\"']?[a-zA-Z0-9_-]{24,}"),
+    base_confidence=0.88,
+)
+
+# Azure
+AZURE_STORAGE_KEY = RegexRule(
+    id="azure_storage_key",
+    type="Azure Storage Account Key",
+    pattern=re.compile(r"AccountKey=[a-zA-Z0-9+/=]{88}"),
+    base_confidence=0.95,
+)
+AZURE_CONNECTION_STRING = RegexRule(
+    id="azure_connection_string",
+    type="Azure Connection String",
+    pattern=re.compile(r"DefaultEndpointsProtocol=https;AccountName=[^;]+;AccountKey="),
+    base_confidence=0.9,
+)
+AZURE_SUBSCRIPTION = RegexRule(
+    id="azure_subscription_id",
+    type="Azure Subscription ID",
+    pattern=re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"),
+    base_confidence=0.5,
+)
+
+# Slack
+SLACK_BOT_TOKEN = RegexRule(
+    id="slack_bot_token",
+    type="Slack Bot Token",
+    pattern=re.compile(r"xoxb-[0-9]{10,13}-[a-zA-Z0-9-]{24,}"),
+    base_confidence=0.95,
+)
+SLACK_USER_TOKEN = RegexRule(
+    id="slack_user_token",
+    type="Slack User Token",
+    pattern=re.compile(r"xoxp-[0-9]{10,13}-[a-zA-Z0-9-]{24,}"),
+    base_confidence=0.95,
+)
+SLACK_WEBHOOK = RegexRule(
+    id="slack_webhook",
+    type="Slack Webhook URL",
+    pattern=re.compile(r"https://hooks\.slack\.com/services/T[A-Z0-9]+/B[A-Z0-9]+/[a-zA-Z0-9]+"),
+    base_confidence=0.95,
+)
+
+# Twilio
+TWILIO_API_KEY = RegexRule(
+    id="twilio_api_key",
+    type="Twilio API Key (SK...)",
+    pattern=re.compile(r"SK[0-9a-fA-F]{32}"),
+    base_confidence=0.95,
+)
+TWILIO_ACCOUNT_SID = RegexRule(
+    id="twilio_account_sid",
+    type="Twilio Account SID",
+    pattern=re.compile(r"AC[0-9a-fA-F]{32}"),
+    base_confidence=0.9,
+)
+
+# SendGrid / Mailgun
+SENDGRID_API_KEY = RegexRule(
+    id="sendgrid_api_key",
+    type="SendGrid API Key",
+    pattern=re.compile(r"SG\.[a-zA-Z0-9_-]{22}\.[a-zA-Z0-9_-]{43}"),
+    base_confidence=0.95,
+)
+MAILGUN_API_KEY = RegexRule(
+    id="mailgun_api_key",
+    type="Mailgun API Key",
+    pattern=re.compile(r"key-[0-9a-fA-F]{32}"),
+    base_confidence=0.9,
+)
+
+# JWT
+JWT_TOKEN = RegexRule(
+    id="jwt",
+    type="JWT Token",
+    pattern=re.compile(r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+"),
+    base_confidence=0.92,
+)
+
+# Generic auth
+BEARER_TOKEN = RegexRule(
+    id="bearer_token",
+    type="Bearer Token",
+    pattern=re.compile(r"(?i)Bearer\s+[a-zA-Z0-9_.-]{20,}"),
+    base_confidence=0.75,
+)
+BASIC_AUTH = RegexRule(
+    id="basic_auth",
+    type="Basic Auth Credentials",
+    pattern=re.compile(r"(?i)Basic\s+[A-Za-z0-9+/=]{20,}"),
+    base_confidence=0.8,
+)
+
+# Generic env / connection string
+CONNECTION_STRING_PASSWORD = RegexRule(
+    id="connection_string_password",
+    type="Connection String with Password",
+    pattern=re.compile(r"(?i)(password|pwd|passwd)=[^\s;]+"),
+    base_confidence=0.85,
+)
+GENERIC_SECRET_ENV = RegexRule(
+    id="generic_secret_env",
+    type="Generic *_SECRET / *_KEY env",
+    pattern=re.compile(r"(?i)\b[A-Z_]+(?:SECRET|KEY|TOKEN|PASSWORD)\s*=\s*[^#\s]+"),
+    base_confidence=0.75,
+)
+
+# More providers
+DROPBOX_ACCESS_TOKEN = RegexRule(
+    id="dropbox_token",
+    type="Dropbox Access Token",
+    pattern=re.compile(r"sl\.[a-zA-Z0-9_-]{135}"),
+    base_confidence=0.95,
+)
+HEROKU_API_KEY = RegexRule(
+    id="heroku_api_key",
+    type="Heroku API Key",
+    pattern=re.compile(r"[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}"),
+    base_confidence=0.4,
+)
+NPM_TOKEN = RegexRule(
+    id="npm_token",
+    type="NPM Token",
+    pattern=re.compile(r"npm_[a-zA-Z0-9]{36}"),
+    base_confidence=0.95,
+)
+DIGITALOCEAN_TOKEN = RegexRule(
+    id="digitalocean_token",
+    type="DigitalOcean Token",
+    pattern=re.compile(r"dop_v1_[a-f0-9]{64}"),
+    base_confidence=0.95,
+)
+TWITTER_BEARER = RegexRule(
+    id="twitter_bearer",
+    type="Twitter Bearer Token",
+    pattern=re.compile(r"AAAAAAAAAAAAAAAAAAAAA[a-zA-Z0-9%]+"),
+    base_confidence=0.85,
+)
+STRIPE_TEST_KEY = RegexRule(
+    id="stripe_test_key",
+    type="Stripe Test Key (sk_test_...)",
+    pattern=re.compile(r"sk_test_[A-Za-z0-9]{24,}"),
+    base_confidence=0.95,
+)
+GITHUB_APP_SECRET = RegexRule(
+    id="github_app_secret",
+    type="GitHub App Secret",
+    pattern=re.compile(r"(?i)ghs_[a-zA-Z0-9]{36}"),
+    base_confidence=0.95,
+)
+GITHUB_OAUTH = RegexRule(
+    id="github_oauth",
+    type="GitHub OAuth Secret",
+    pattern=re.compile(r"(?i)gho_[a-zA-Z0-9]{36}"),
+    base_confidence=0.95,
+)
+GENERIC_API_KEY_PATTERN = RegexRule(
+    id="generic_api_key",
+    type="Generic API Key Pattern",
+    pattern=re.compile(r"(?i)api[_-]?key[\"']?\s*[:=]\s*[\"']?[a-zA-Z0-9_-]{20,}"),
+    base_confidence=0.7,
+)
+PRIVATE_KEY_EC = RegexRule(
+    id="private_key_ec",
+    type="EC Private Key",
+    pattern=re.compile(r"-----BEGIN EC PRIVATE KEY-----"),
+    base_confidence=0.99,
+)
+OPENSSH_PRIVATE_KEY = RegexRule(
+    id="openssh_private_key",
+    type="OpenSSH Private Key",
+    pattern=re.compile(r"-----BEGIN OPENSSH PRIVATE KEY-----"),
+    base_confidence=0.99,
+)
+REDIS_URL = RegexRule(
+    id="redis_url",
+    type="Redis URL",
+    pattern=re.compile(r"redis(?:s)?://[^\s]+"),
+    base_confidence=0.88,
+)
+AMQP_URL = RegexRule(
+    id="amqp_url",
+    type="AMQP URL",
+    pattern=re.compile(r"amqps?://[^\s]+"),
+    base_confidence=0.85,
+)
+FIREBASE_KEY = RegexRule(
+    id="firebase_key",
+    type="Firebase/Google Cloud Key",
+    pattern=re.compile(r"(?i)(?:firebase|gcp)[\"']?\s*[:=].*[\"']?AIza[0-9A-Za-z_-]{35}"),
+    base_confidence=0.9,
+)
+DATADOG_API_KEY = RegexRule(
+    id="datadog_api_key",
+    type="Datadog API Key",
+    pattern=re.compile(r"[a-f0-9]{32}"),
+    base_confidence=0.35,
+)
+NEW_RELIC_LICENSE = RegexRule(
+    id="new_relic_license",
+    type="New Relic License Key",
+    pattern=re.compile(r"[0-9a-f]{40}"),
+    base_confidence=0.4,
+)
+SQUARE_ACCESS_TOKEN = RegexRule(
+    id="square_token",
+    type="Square Access Token",
+    pattern=re.compile(r"sq0atp-[a-zA-Z0-9_-]{22,}"),
+    base_confidence=0.95,
+)
+PAYPAL_CLIENT = RegexRule(
+    id="paypal_client",
+    type="PayPal Client Secret",
+    pattern=re.compile(r"([A-Z]{2}[0-9]{2})?[A-Za-z0-9]{80,}"),
+    base_confidence=0.35,
+)
+DISCORD_TOKEN = RegexRule(
+    id="discord_token",
+    type="Discord Token",
+    pattern=re.compile(r"[MN][A-Za-z\d]{23,}\.[\w-]{6}\.[\w-]{27,38}"),
+    base_confidence=0.92,
+)
+TELEGRAM_BOT = RegexRule(
+    id="telegram_bot",
+    type="Telegram Bot Token",
+    pattern=re.compile(r"\d{8,10}:[a-zA-Z0-9_-]{35}"),
+    base_confidence=0.95,
+)
+SPARKPOST_API = RegexRule(
+    id="sparkpost_api",
+    type="SparkPost API Key",
+    pattern=re.compile(r"[a-f0-9]{40}"),
+    base_confidence=0.35,
+)
+CODECOV_TOKEN = RegexRule(
+    id="codecov_token",
+    type="Codecov Token",
+    pattern=re.compile(r"[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}"),
+    base_confidence=0.4,
+)
+VERCEL_TOKEN = RegexRule(
+    id="vercel_token",
+    type="Vercel Token",
+    pattern=re.compile(r"[A-Za-z0-9]{24}"),
+    base_confidence=0.35,
+)
+SUPABASE_ANON = RegexRule(
+    id="supabase_anon",
+    type="Supabase Anon Key",
+    pattern=re.compile(r"eyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.([A-Za-z0-9_-]+)"),
+    base_confidence=0.5,
+)
+PAGERDUTY_KEY = RegexRule(
+    id="pagerduty_key",
+    type="PagerDuty API Key",
+    pattern=re.compile(r"[a-f0-9]{32}"),
+    base_confidence=0.35,
+)
+LINEAR_API = RegexRule(
+    id="linear_api",
+    type="Linear API Key",
+    pattern=re.compile(r"lin_api_[a-zA-Z0-9]{40}"),
+    base_confidence=0.95,
+)
+
 
 ALL_RULES: List[RegexRule] = [
     AWS_ACCESS_KEY,
@@ -81,8 +357,47 @@ ALL_RULES: List[RegexRule] = [
     DATABASE_URL,
     ENV_ASSIGNMENT,
     GENERIC_HIGH_ENTROPY,
-    # Additional rules for other providers (Google, Azure, Slack, Twilio, etc.)
-    # would be added here to reach 50+ total patterns.
+    GOOGLE_API_KEY,
+    GOOGLE_OAUTH,
+    AZURE_STORAGE_KEY,
+    AZURE_CONNECTION_STRING,
+    SLACK_BOT_TOKEN,
+    SLACK_USER_TOKEN,
+    SLACK_WEBHOOK,
+    TWILIO_API_KEY,
+    TWILIO_ACCOUNT_SID,
+    SENDGRID_API_KEY,
+    MAILGUN_API_KEY,
+    JWT_TOKEN,
+    BEARER_TOKEN,
+    BASIC_AUTH,
+    CONNECTION_STRING_PASSWORD,
+    GENERIC_SECRET_ENV,
+    DROPBOX_ACCESS_TOKEN,
+    NPM_TOKEN,
+    DIGITALOCEAN_TOKEN,
+    TWITTER_BEARER,
+    STRIPE_TEST_KEY,
+    GITHUB_APP_SECRET,
+    GITHUB_OAUTH,
+    GENERIC_API_KEY_PATTERN,
+    PRIVATE_KEY_EC,
+    OPENSSH_PRIVATE_KEY,
+    REDIS_URL,
+    AMQP_URL,
+    FIREBASE_KEY,
+    DATADOG_API_KEY,
+    NEW_RELIC_LICENSE,
+    SQUARE_ACCESS_TOKEN,
+    PAYPAL_CLIENT,
+    DISCORD_TOKEN,
+    TELEGRAM_BOT,
+    SPARKPOST_API,
+    CODECOV_TOKEN,
+    VERCEL_TOKEN,
+    SUPABASE_ANON,
+    PAGERDUTY_KEY,
+    LINEAR_API,
 ]
 
 

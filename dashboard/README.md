@@ -1,11 +1,30 @@
-## SecretSentinel Dashboard (stub)
+## SecretSentinel Dashboard
 
-This directory will contain the React 19 + TypeScript + Tailwind CSS dashboard for SecretSentinel.
+React 19 + TypeScript + Tailwind CSS dashboard for viewing and managing secrets.
 
-Planned responsibilities:
+### Features
 
-- Visualize secret inventory, rotation status, and policy enforcement.
-- Provide workflows for onboarding projects, configuring pre-commit hooks, and managing Vault integrations.
-- Surface alerts and reports about potential secret exposures detected in CI/CD.
+- **Login** – Token-based (dev: any non-empty token; store in localStorage).
+- **Secrets** – List secret keys per environment (dev/staging/prod), add a secret (key + value), trigger rotate.
 
-Implementation will be added after the core CLI and detection engine are complete.
+API calls go to the same origin in dev (Vite proxies `/api` and `/graphql` to the API gateway). For production, set `VITE_API_URL` at build time to the API base URL.
+
+### Run
+
+```bash
+npm install && npm run dev
+```
+
+Open http://localhost:5173. Ensure the API gateway is running on port 4000 (or set the proxy in `vite.config.ts`).
+
+### Build
+
+```bash
+npm run build
+```
+
+Output in `dist/`. For production, set `VITE_API_URL` before building, e.g.:
+
+```bash
+VITE_API_URL=https://api.example.com npm run build
+```

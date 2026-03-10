@@ -1,12 +1,25 @@
-## SecretSentinel Rotation Worker (stub)
+## SecretSentinel Rotation Worker
 
-This directory will contain the Node.js 22 rotation worker that processes rotation requests and coordinates with the Vault service.
+Node.js 22 worker that polls an AWS SQS queue for rotation events and triggers the Vault service to rotate secrets.
 
-Planned responsibilities:
+### Behaviour
 
-- Listen to AWS SQS queues for rotation events.
-- Perform provider-specific rotation workflows (e.g., database passwords, API keys).
-- Update HashiCorp Vault with new secret values.
-- Emit audit events for the API gateway and dashboard.
+- Polls `SQS_ROTATION_QUEUE_URL` (long polling). If unset, runs in stub mode (idle).
+- Each message body must be JSON: `{ "env": "dev", "key": "DATABASE_URL", "tenant": "optional" }`.
+- For each message, calls `PUT VAULT_URL/secrets/:env/:key/rotate` with optional auth, then deletes the message on success.
 
-Implementation will be added after the CLI and detection engine are complete.
+### Env
+
+- `SQS_ROTATION_QUEUE_URL` – SQS queue URL (optional; if missing, worker does nothing).
+- `VAULT_URL` – Vault API base (default `http://localhost:3000`).
+- `SENTINEL_TOKEN` – Optional Bearer token for Vault.
+- `AWS_REGION` – AWS region for SQS (default `us-east-1`).
+- `POLL_INTERVAL_MS` – Delay between poll cycles (default 20000).
+
+### Run
+
+```bash
+npm install && npm run build && npm start
+```
+
+Or use the Dockerfile; ensure `VAULT_URL` points at the Vault service.

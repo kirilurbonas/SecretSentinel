@@ -99,6 +99,33 @@ func TestInlineIgnoreComment(t *testing.T) {
 	}
 }
 
+func TestGoogleAPIKeyPattern(t *testing.T) {
+	key := "AIza" + "SyBxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+	line := `apiKey: "` + key + `"`
+	results := ScanFile("config.js", []string{line}, map[int]struct{}{1: {}})
+	if !containsRule(results, "google_api_key") {
+		t.Fatalf("expected google_api_key finding")
+	}
+}
+
+func TestSlackBotTokenPattern(t *testing.T) {
+	tok := "xoxb-" + "123456789012" + "-" + "abcdefghijklmnopqrstuvwx"
+	line := `SLACK_BOT_TOKEN=` + tok
+	results := ScanFile(".env", []string{line}, map[int]struct{}{1: {}})
+	if !containsRule(results, "slack_bot_token") {
+		t.Fatalf("expected slack_bot_token finding")
+	}
+}
+
+func TestJWTPattern(t *testing.T) {
+	jwt := "eyJ" + "hbGciOiJIUzI1NiJ9.eyJ" + "zdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFzp0x7YyE"
+	line := `const token = "` + jwt + `"`
+	results := ScanFile("auth.js", []string{line}, map[int]struct{}{1: {}})
+	if !containsRule(results, "jwt") {
+		t.Fatalf("expected jwt finding")
+	}
+}
+
 func containsRule(findings []Finding, ruleID string) bool {
 	for _, f := range findings {
 		if f.Rule == ruleID {

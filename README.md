@@ -9,11 +9,13 @@ The core of the system is a pre-commit hook CLI (`sentineld`) and a detection en
 - `cli/` – Go 1.22 CLI (`sentineld`) providing:
   - `sentineld init` to install a Git pre-commit hook.
   - `sentineld scan --staged` to scan staged changes for secrets before each commit.
+  - `sentineld scan --path <dir>` to scan all files under a directory (e.g. for CI).
+  - `sentineld scan --json` for machine-readable findings. Use `SENTINEL_DETECTION_URL` (e.g. `http://localhost:8000`) to enable the detection service.
 - `detection/` – Python 3.12 FastAPI detection microservice combining regex rules, Shannon entropy, and context-aware scoring.
-- `vault/` – Node.js 22 HashiCorp Vault wrapper service (stubbed for now).
-- `rotation/` – Node.js 22 rotation worker using AWS SQS (stubbed for now).
-- `api/` – Apollo GraphQL + REST gateway (stubbed for now).
-- `dashboard/` – React 19 + TypeScript + Tailwind CSS frontend (stubbed for now).
+- `vault/` – Node.js 22 Vault HTTP API (in-memory or HashiCorp Vault) and `@sentineldev/sdk`.
+- `rotation/` – Node.js 22 rotation worker (polls AWS SQS, calls Vault rotate).
+- `api/` – API gateway (GraphQL + REST proxy to detection and vault, JWT-friendly).
+- `dashboard/` – React 19 + TypeScript + Tailwind dashboard (login, secrets list/add/rotate).
 - `shared/` – Shared types and protocol definitions.
 - `infra/` – Local Docker Compose and Terraform stubs for AWS ECS Fargate deployments.
 
@@ -61,11 +63,15 @@ The detection service exposes `GET /health` for load balancers and orchestrators
 
 When running locally (for example via Docker Compose), the CLI will default to calling the detection service at `http://localhost:8000` and merge remote findings with its own local detections.
 
-### Future components (not implemented yet)
+### Vault service and SDK
 
-- `vault/` – Multi-tenant Vault-backed secrets API and an accompanying `@sentineldev/sdk` npm package for fetching, caching, and injecting secrets into `process.env`.
-- `rotation/` – Rotation worker listening to AWS SQS events to rotate secrets and update Vault.
-- `api/` – GraphQL and REST gateway that exposes a unified API across detection, vault, and rotation.
-- `dashboard/` – Web dashboard for visualizing secret usage, rotation status, and policy enforcement.
+- **Vault** (`vault/`) – Node.js 22 HTTP API wrapping HashiCorp Vault (or in-memory store for local dev): `GET/POST /secrets/:env/:key`, `GET /secrets/:env` (list keys), `PUT .../rotate`.
+- **SDK** (`vault/sdk/`) – `@sentineldev/sdk`: `get(key, { env })`, `inject(keys, { env })`, cache (default 5 min), `SentinelSecretNotFoundError` when missing.
 
-These components will be implemented after the CLI and detection engine are stable and battle-tested.
+### Full stack (Docker Compose)
+
+From repo root, run `cd infra && docker compose up -d` to start:
+
+- **detection** (8000), **vault** (3000), **api** (4000), **rotation** (worker), **dashboard** (8080), **db** (5432).
+
+Set `SQS_ROTATION_QUEUE_URL` for the rotation worker to poll AWS SQS. The dashboard proxies `/api` and `/graphql` to the API gateway when using `npm run dev` (see dashboard `vite.config.ts`); in production, point the dashboard at the API URL.

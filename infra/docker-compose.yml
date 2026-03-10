@@ -16,6 +16,54 @@ services:
       retries: 3
       start_period: 10s
 
+  vault:
+    build:
+      context: ../vault
+      dockerfile: Dockerfile
+    container_name: secretsentinel-vault
+    ports:
+      - "3000:3000"
+    environment:
+      - PORT=3000
+    restart: unless-stopped
+
+  api:
+    build:
+      context: ../api
+      dockerfile: Dockerfile
+    container_name: secretsentinel-api
+    ports:
+      - "4000:4000"
+    environment:
+      - PORT=4000
+      - DETECTION_URL=http://detection:8000
+      - VAULT_URL=http://vault:3000
+    depends_on:
+      - detection
+      - vault
+    restart: unless-stopped
+
+  rotation:
+    build:
+      context: ../rotation
+      dockerfile: Dockerfile
+    container_name: secretsentinel-rotation
+    environment:
+      - VAULT_URL=http://vault:3000
+      - SQS_ROTATION_QUEUE_URL=${SQS_ROTATION_QUEUE_URL:-}
+    depends_on:
+      - vault
+    restart: unless-stopped
+
+  dashboard:
+    build:
+      context: ../dashboard
+      dockerfile: Dockerfile
+    container_name: secretsentinel-dashboard
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+
   db:
     image: postgres:16
     container_name: secretsentinel-postgres

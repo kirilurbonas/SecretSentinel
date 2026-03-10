@@ -1,12 +1,44 @@
 package output
 
 import (
+	"encoding/json"
 	"fmt"
+	"os"
 	"sort"
 	"strings"
 
 	"github.com/sentineldev/secretsentinel/cli/internal/detect"
 )
+
+// JSONFinding is the shape emitted by PrintFindingsJSON for CI/scripts.
+type JSONFinding struct {
+	File  string `json:"file"`
+	Line  int    `json:"line"`
+	Type  string `json:"type"`
+	Value string `json:"value"`
+}
+
+// PrintFindingsJSON prints findings as a JSON array of {file, line, type, value}.
+func PrintFindingsJSON(findings []detect.Finding) {
+	sort.Slice(findings, func(i, j int) bool {
+		if findings[i].File == findings[j].File {
+			return findings[i].Line < findings[j].Line
+		}
+		return findings[i].File < findings[j].File
+	})
+	out := make([]JSONFinding, 0, len(findings))
+	for _, f := range findings {
+		out = append(out, JSONFinding{
+			File:  f.File,
+			Line:  f.Line,
+			Type:  f.Type,
+			Value: f.Value,
+		})
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetEscapeHTML(false)
+	_ = enc.Encode(out)
+}
 
 // PrintFindings prints findings in the required SecretSentinel CLI format.
 func PrintFindings(findings []detect.Finding) {
@@ -61,6 +93,12 @@ func ruleHint(ruleID string) string {
 		return "Move this configuration value into your SecretSentinel vault and reference it via environment variables."
 	case "high_entropy":
 		return "Review this high-entropy value; if it is a secret, move it into your SecretSentinel vault."
+	case "google_api_key":
+		return vaultHint("GOOGLE_API_KEY")
+	case "slack_bot_token":
+		return vaultHint("SLACK_BOT_TOKEN")
+	case "jwt", "bearer_token", "basic_auth":
+		return "Move this token to your SecretSentinel vault and reference it via environment variables."
 	default:
 		return "Move this value to your SecretSentinel vault and reference it via environment variables."
 	}

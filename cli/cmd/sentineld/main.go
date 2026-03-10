@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -24,7 +25,7 @@ func main() {
 		}
 	case "scan":
 		exitCode, err := commands.RunScan(args)
-		if err != nil {
+		if err != nil && !errors.Is(err, commands.ErrSecretsFound) {
 			fmt.Fprintln(os.Stderr, "sentineld scan error:", err)
 		}
 		os.Exit(exitCode)
@@ -43,6 +44,8 @@ func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  sentineld init                  Install Git pre-commit hook")
 	fmt.Println("  sentineld scan --staged         Scan staged changes for secrets")
+	fmt.Println("  sentineld scan --path <dir>     Scan all files under <dir> (e.g. for CI)")
+	fmt.Println("  sentineld scan --help           Show scan options and SENTINEL_DETECTION_URL")
 	fmt.Println("  sentineld help                  Show this help message")
 }
 
