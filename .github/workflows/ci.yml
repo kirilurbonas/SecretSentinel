@@ -17,7 +17,7 @@ jobs:
           go-version: "1.22"
       - name: Run tests
         run: |
-          cd cli && go test -cover ./...
+          cd cli && go test -cover -coverprofile=coverage.out ./...
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
@@ -42,10 +42,42 @@ jobs:
       - name: Pytest
         run: cd detection && pytest tests/ -v
 
+  vault-test:
+    name: Vault (Node.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        run: cd vault && npm install
+      - name: Run tests
+        run: cd vault && npm test
+        env:
+          VAULT_AUTH_SECRET: test-vault-auth-secret
+          VAULT_ENCRYPTION_KEY: test-vault-encryption-key
+          DATABASE_URL: ""
+
+  api-test:
+    name: API Gateway (Node.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        run: cd api && npm install
+      - name: Run tests
+        run: cd api && npm test
+        env:
+          JWT_SECRET: test-jwt-secret-for-ci
+
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [cli, detection]
+    needs: [cli, detection, vault-test, api-test]
     steps:
       - uses: actions/checkout@v4
       - name: Build CLI
@@ -53,3 +85,45 @@ jobs:
           cd cli && CGO_ENABLED=0 go build -o sentineld ./cmd/sentineld
       - name: Build detection image
         run: docker build -t secretsentinel-detection:latest ./detection
+      - name: Build vault image
+        run: docker build -t secretsentinel-vault:latest ./vault
+
+  security:
+    name: Security Scanning
+    runs-on: ubuntu-latest
+    needs: [build]
+    permissions:
+      security-events: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Run Trivy on detection image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: secretsentinel-detection:latest
+          format: sarif
+          output: trivy-detection.sarif
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+      - name: Run Trivy on vault image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: secretsentinel-vault:latest
+          format: sarif
+          output: trivy-vault.sarif
+          exit-code: "1"
+          severity: CRITICAL,HIGH
+      - name: Upload Trivy SARIF results
+        uses: github/codeql-action/upload-sarif@v3
+        if: always()
+        with:
+          sarif_file: "."
+      - name: Run gitleaks secret scan
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Generate SBOM for detection image
+        uses: anchore/sbom-action@v0
+        with:
+          image: secretsentinel-detection:latest
+          format: spdx-json
+          artifact-name: detection-sbom.spdx.json

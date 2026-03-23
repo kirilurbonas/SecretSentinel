@@ -25,7 +25,19 @@ services:
       - "3000:3000"
     environment:
       - PORT=3000
+      - DATABASE_URL=postgresql://sentinel:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/sentinel
+      - VAULT_AUTH_SECRET=${VAULT_AUTH_SECRET:?VAULT_AUTH_SECRET must be set}
+      - VAULT_ENCRYPTION_KEY=${VAULT_ENCRYPTION_KEY:?VAULT_ENCRYPTION_KEY must be set}
+    depends_on:
+      db:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   api:
     build:
@@ -38,10 +50,20 @@ services:
       - PORT=4000
       - DETECTION_URL=http://detection:8000
       - VAULT_URL=http://vault:3000
+      - JWT_SECRET=${JWT_SECRET:?JWT_SECRET must be set}
+      - ALLOWED_ORIGINS=${ALLOWED_ORIGINS:-http://localhost:8080}
     depends_on:
-      - detection
-      - vault
+      detection:
+        condition: service_healthy
+      vault:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:4000/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   rotation:
     build:
@@ -50,10 +72,18 @@ services:
     container_name: secretsentinel-rotation
     environment:
       - VAULT_URL=http://vault:3000
+      - VAULT_AUTH_SECRET=${VAULT_AUTH_SECRET:?VAULT_AUTH_SECRET must be set}
       - SQS_ROTATION_QUEUE_URL=${SQS_ROTATION_QUEUE_URL:-}
     depends_on:
-      - vault
+      vault:
+        condition: service_healthy
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "test", "-f", "/tmp/sentinel-alive"]
+      interval: 60s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   dashboard:
     build:
@@ -63,19 +93,31 @@ services:
     ports:
       - "8080:8080"
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:8080/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   db:
     image: postgres:16
     container_name: secretsentinel-postgres
     environment:
       - POSTGRES_USER=sentinel
-      - POSTGRES_PASSWORD=sentinel
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       - POSTGRES_DB=sentinel
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sentinel -d sentinel"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
 
 volumes:
   postgres_data:

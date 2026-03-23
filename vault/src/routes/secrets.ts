@@ -70,6 +70,10 @@ secretsRouter.put("/:env/:key/rotate", async (req: ReqWithTenant, res: Response)
     res.status(400).json({ error: "env and key required" });
     return;
   }
-  await vault.triggerRotate(tenant(req), env, key);
-  res.json({ ok: true, message: "Rotation triggered" });
+  try {
+    await vault.triggerRotate(tenant(req), env, key);
+    res.json({ ok: true, rotated: true, key });
+  } catch (err) {
+    res.status(500).json({ error: "Rotation failed", detail: String(err) });
+  }
 });

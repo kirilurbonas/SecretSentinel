@@ -1,18 +1,14 @@
 import vault from "node-vault";
-import {
-  memoryGet,
-  memoryListKeys,
-  memorySet,
-} from "./store.js";
+import { memoryGet, memoryListKeys, memorySet } from "./store.js";
+import { log } from "./logger.js";
 
-const useVault = Boolean(process.env.VAULT_ADDR);
 let vaultClient: ReturnType<typeof vault> | null = null;
 
 function getClient(): ReturnType<typeof vault> | null {
-  if (!useVault) return null;
+  if (!process.env.VAULT_ADDR) return null;
   if (!vaultClient) {
     vaultClient = vault({
-      endpoint: process.env.VAULT_ADDR ?? "http://127.0.0.1:8200",
+      endpoint: process.env.VAULT_ADDR,
       token: process.env.VAULT_TOKEN,
     });
   }
@@ -26,7 +22,7 @@ function secretPath(tenant: string, env: string, key: string): string {
 export async function getSecret(
   tenant: string,
   env: string,
-  key: string
+  key: string,
 ): Promise<string | undefined> {
   const client = getClient();
   if (client) {
@@ -45,14 +41,14 @@ export async function setSecret(
   tenant: string,
   env: string,
   key: string,
-  value: string
+  value: string,
 ): Promise<void> {
   const client = getClient();
   if (client) {
     await client.write(secretPath(tenant, env, key), { data: { value } });
     return;
   }
-  memorySet(tenant, env, key, value);
+  await memorySet(tenant, env, key, value);
 }
 
 export async function listKeys(tenant: string, env: string): Promise<string[]> {
@@ -70,11 +66,28 @@ export async function listKeys(tenant: string, env: string): Promise<string[]> {
   return memoryListKeys(tenant, env);
 }
 
-export async function triggerRotate(
-  _tenant: string,
-  _env: string,
-  _key: string
-): Promise<void> {
-  // Stub: in production would enqueue to SQS or call rotation worker
-  return;
+/**
+ * Rotates a secret using the appropriate provider based on key naming convention.
+ * - Keys prefixed with "aws_iam_" use the AWS IAM provider.
+ * - All other keys use the generic random-bytes provider.
+ */
+export async function triggerRotate(tenant: string, env: string, key: string): Promise<string> {
+  const currentValue = await getSecret(tenant, env, key);
+  if (currentValue === undefined) {
+    throw new Error(`Secret not found: ${tenant}/${env}/${key}`);
+  }
+
+  let newValue: string;
+
+  if (key.startsWith("aws_iam_")) {
+    const { rotate } = await import("./providers/aws.js");
+    newValue = await rotate(tenant, env, key, currentValue);
+  } else {
+    const { rotate } = await import("./providers/generic.js");
+    newValue = await rotate(tenant, env, key, currentValue);
+  }
+
+  await setSecret(tenant, env, key, newValue);
+  log.info("secret rotated", { tenant, env, key });
+  return newValue;
 }

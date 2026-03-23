@@ -54,5 +54,13 @@ export const resolvers = {
       await vaultFetch(`/secrets/${encodeURIComponent(env)}/${encodeURIComponent(key)}/rotate`, { method: "PUT" });
       return key;
     },
+    async validateSecret(_: unknown, { type, value }: { type: string; value: string }) {
+      const r = await detectionFetch("/validate", { type, value }) as {
+        live?: boolean | null;
+        checked_at?: string;
+        error?: string | null;
+      };
+      return { live: r.live ?? null, checkedAt: r.checked_at ?? "", error: r.error ?? null };
+    },
   },
 };

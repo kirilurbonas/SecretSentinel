@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"strconv"
 	"time"
 
 	internalgit "github.com/sentineldev/secretsentinel/cli/internal/git"
@@ -35,12 +37,32 @@ type batchResponse struct {
 	Files []batchFileResult `json:"files"`
 }
 
+// remoteTimeout returns the HTTP timeout for remote detection calls.
+// Reads SENTINEL_REMOTE_TIMEOUT_SECONDS (default 30, capped at 300).
+func remoteTimeout() time.Duration {
+	if s := os.Getenv("SENTINEL_REMOTE_TIMEOUT_SECONDS"); s != "" {
+		if n, err := strconv.Atoi(s); err == nil && n > 0 {
+			if n > 300 {
+				n = 300
+			}
+			return time.Duration(n) * time.Second
+		}
+	}
+	return 30 * time.Second
+}
+
+func applyAuth(req *http.Request, authToken string) {
+	if authToken != "" {
+		req.Header.Set("Authorization", "Bearer "+authToken)
+	}
+}
+
 // RemoteScanBatch calls the detection service /scan/batch endpoint and maps
 // its findings into CLI Finding values. It only sends file contents; the
 // remote service is responsible for its own detection logic.
-func RemoteScanBatch(baseURL string, changes []internalgit.FileChange) ([]Finding, error) {
+func RemoteScanBatch(baseURL string, changes []internalgit.FileChange, authToken string) ([]Finding, error) {
 	client := &http.Client{
-		Timeout: 3 * time.Second,
+		Timeout: remoteTimeout(),
 	}
 
 	reqBody := batchRequest{
@@ -77,6 +99,7 @@ func RemoteScanBatch(baseURL string, changes []internalgit.FileChange) ([]Findin
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	applyAuth(httpReq, authToken)
 
 	resp, err := client.Do(httpReq)
 	if err != nil {
@@ -117,7 +140,7 @@ type PathContent struct {
 
 // RemoteScanBatchWithContent calls the detection service /scan/batch with
 // pre-read file contents (e.g. for --path mode where git show is not used).
-func RemoteScanBatchWithContent(baseURL string, files []PathContent) ([]Finding, error) {
+func RemoteScanBatchWithContent(baseURL string, files []PathContent, authToken string) ([]Finding, error) {
 	if len(files) == 0 {
 		return nil, nil
 	}
@@ -130,7 +153,7 @@ func RemoteScanBatchWithContent(baseURL string, files []PathContent) ([]Finding,
 			Filename: f.Path,
 		})
 	}
-	client := &http.Client{Timeout: 3 * time.Second}
+	client := &http.Client{Timeout: remoteTimeout()}
 	data, err := json.Marshal(reqBody)
 	if err != nil {
 		return nil, fmt.Errorf("marshal batch request: %w", err)
@@ -148,6 +171,7 @@ func RemoteScanBatchWithContent(baseURL string, files []PathContent) ([]Finding,
 		return nil, fmt.Errorf("create request: %w", err)
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
+	applyAuth(httpReq, authToken)
 	resp, err := client.Do(httpReq)
 	if err != nil {
 		return nil, fmt.Errorf("post %s: %w", url, err)
@@ -259,4 +283,3 @@ outer:
 	}
 	return -1
 }
-

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Iterable, List
+from typing import Iterable, List, Optional
 
 from .entropy import shannon_entropy
 
@@ -13,6 +13,7 @@ class RegexRule:
     type: str
     pattern: re.Pattern[str]
     base_confidence: float
+    filename_filter: Optional[re.Pattern[str]] = None
 
 
 AWS_ACCESS_KEY = RegexRule(
@@ -347,13 +348,44 @@ LINEAR_API = RegexRule(
     base_confidence=0.95,
 )
 
+# GCP service account JSON — structural marker unique to GCP SA files
+GCP_SERVICE_ACCOUNT = RegexRule(
+    id="gcp_service_account",
+    type="GCP Service Account Key",
+    pattern=re.compile(r'"type"\s*:\s*"service_account"'),
+    base_confidence=0.97,
+)
+
+# AWS STS session tokens — much longer than regular access keys (100+ chars)
+AWS_STS_TOKEN = RegexRule(
+    id="aws_sts_token",
+    type="AWS STS Session Token",
+    pattern=re.compile(r"(?i)(session_token|aws_session_token)\s*[=:]\s*[A-Za-z0-9/+=]{100,}"),
+    base_confidence=0.93,
+)
+
+# Kubernetes Secret YAML — only fires on .yaml/.yml files
+K8S_SECRET_YAML = RegexRule(
+    id="k8s_secret_yaml",
+    type="Kubernetes Secret (YAML)",
+    pattern=re.compile(r"(?i)^kind:\s*Secret\s*$"),
+    base_confidence=0.75,
+    filename_filter=re.compile(r"\.ya?ml$"),
+)
+
 
 ALL_RULES: List[RegexRule] = [
     AWS_ACCESS_KEY,
     AWS_SECRET_KEY,
+    AWS_STS_TOKEN,
     GITHUB_PAT,
+    GITHUB_APP_SECRET,
+    GITHUB_OAUTH,
     STRIPE_SECRET,
+    STRIPE_TEST_KEY,
     PRIVATE_KEY,
+    PRIVATE_KEY_EC,
+    OPENSSH_PRIVATE_KEY,
     DATABASE_URL,
     ENV_ASSIGNMENT,
     GENERIC_HIGH_ENTROPY,
@@ -377,31 +409,23 @@ ALL_RULES: List[RegexRule] = [
     NPM_TOKEN,
     DIGITALOCEAN_TOKEN,
     TWITTER_BEARER,
-    STRIPE_TEST_KEY,
-    GITHUB_APP_SECRET,
-    GITHUB_OAUTH,
     GENERIC_API_KEY_PATTERN,
-    PRIVATE_KEY_EC,
-    OPENSSH_PRIVATE_KEY,
     REDIS_URL,
     AMQP_URL,
     FIREBASE_KEY,
-    DATADOG_API_KEY,
-    NEW_RELIC_LICENSE,
     SQUARE_ACCESS_TOKEN,
-    PAYPAL_CLIENT,
     DISCORD_TOKEN,
     TELEGRAM_BOT,
-    SPARKPOST_API,
-    CODECOV_TOKEN,
-    VERCEL_TOKEN,
     SUPABASE_ANON,
-    PAGERDUTY_KEY,
     LINEAR_API,
+    GCP_SERVICE_ACCOUNT,
+    K8S_SECRET_YAML,
 ]
 
 
-def iter_rule_matches(rule: RegexRule, line: str) -> Iterable[str]:
+def iter_rule_matches(rule: RegexRule, line: str, filename: str = "") -> Iterable[str]:
+    if rule.filename_filter is not None and not rule.filename_filter.search(filename):
+        return
     for match in rule.pattern.findall(line):
         # For patterns with groups, findall returns a tuple or first group;
         # normalize by casting to str.

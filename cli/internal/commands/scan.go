@@ -23,6 +23,7 @@ type ScanFlags struct {
 	Path         string
 	JSON         bool
 	DetectionURL string
+	AuthToken    string
 }
 
 // ParseScanArgs parses scan command arguments into ScanFlags.
@@ -37,6 +38,8 @@ func ParseScanArgs(args []string) (ScanFlags, error) {
 			f.JSON = true
 		case strings.HasPrefix(a, "--detection-url="):
 			f.DetectionURL = strings.TrimPrefix(a, "--detection-url=")
+		case strings.HasPrefix(a, "--auth-token="):
+			f.AuthToken = strings.TrimPrefix(a, "--auth-token=")
 		case a == "--path" && i+1 < len(args):
 			i++
 			f.Path = args[i]
@@ -46,6 +49,9 @@ func ParseScanArgs(args []string) (ScanFlags, error) {
 	}
 	if f.DetectionURL == "" {
 		f.DetectionURL = os.Getenv("SENTINEL_DETECTION_URL")
+	}
+	if f.AuthToken == "" {
+		f.AuthToken = os.Getenv("SENTINEL_CLI_TOKEN")
 	}
 	return f, nil
 }
@@ -118,7 +124,7 @@ func RunScan(args []string) (int, error) {
 			allFindings = append(allFindings, detect.ScanFile(p, lines, added)...)
 		}
 		if flags.DetectionURL != "" && len(pathContents) > 0 {
-			extra, err := detect.RemoteScanBatchWithContent(flags.DetectionURL, pathContents)
+			extra, err := detect.RemoteScanBatchWithContent(flags.DetectionURL, pathContents, flags.AuthToken)
 			if err != nil {
 				fmt.Fprintln(os.Stderr, "warning: remote detection failed:", err)
 			} else {
@@ -139,7 +145,7 @@ func RunScan(args []string) (int, error) {
 
 	remoteFindings := allFindings
 	if flags.DetectionURL != "" && len(pathFiles) > 0 {
-		extra, err := detect.RemoteScanBatch(flags.DetectionURL, pathFiles)
+		extra, err := detect.RemoteScanBatch(flags.DetectionURL, pathFiles, flags.AuthToken)
 		if err != nil {
 			fmt.Fprintln(os.Stderr, "warning: remote detection failed:", err)
 		} else {
@@ -214,10 +220,13 @@ func printScanHelp() {
 	fmt.Println("Options:")
 	fmt.Println("  --json                   Output findings as JSON (one object per line or array)")
 	fmt.Println("  --detection-url=<url>    Use detection service at <url> for extra patterns")
+	fmt.Println("  --auth-token=<token>     Bearer token for the detection service")
 	fmt.Println("  -h, --help               Show this help")
 	fmt.Println()
 	fmt.Println("Environment:")
-	fmt.Println("  SENTINEL_DETECTION_URL   Default detection service URL (e.g. http://localhost:8000)")
+	fmt.Println("  SENTINEL_DETECTION_URL         Default detection service URL (e.g. http://localhost:8000)")
+	fmt.Println("  SENTINEL_CLI_TOKEN             Bearer token for the detection service")
+	fmt.Println("  SENTINEL_REMOTE_TIMEOUT_SECONDS  HTTP timeout in seconds for remote detection (default 30)")
 	fmt.Println()
 	fmt.Println("Examples:")
 	fmt.Println("  sentineld scan --staged")

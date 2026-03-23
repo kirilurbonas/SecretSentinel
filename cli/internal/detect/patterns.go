@@ -8,6 +8,7 @@ import (
 var (
 	awsAccessKeyRe     = regexp.MustCompile(`AKIA[0-9A-Z]{16}`)
 	awsSecretKeyRe     = regexp.MustCompile(`[A-Za-z0-9/+=]{40}`)
+	awsSTSTokenRe      = regexp.MustCompile(`(?i)(session_token|aws_session_token)\s*[=:]\s*[A-Za-z0-9/+=]{100,}`)
 	githubPatRe        = regexp.MustCompile(`ghp_[A-Za-z0-9]{36}`)
 	stripeSecretRe     = regexp.MustCompile(`sk_live_[A-Za-z0-9]{24,}`)
 	privateKeyRe       = regexp.MustCompile(`-----BEGIN .* PRIVATE KEY-----`)
@@ -15,10 +16,13 @@ var (
 	envAssignmentRe    = regexp.MustCompile(`(?i)\b(PASSWORD|SECRET|TOKEN|API_KEY)\b\s*=\s*[^#\s]+`)
 	entropyTokenRe     = regexp.MustCompile(`[A-Za-z0-9/\+=]{20,}`)
 	googleAPIKeyRe     = regexp.MustCompile(`AIza[0-9A-Za-z_-]{35}`)
+	gcpServiceAccountRe = regexp.MustCompile(`"type"\s*:\s*"service_account"`)
+	k8sSecretYAMLRe    = regexp.MustCompile(`(?i)^kind:\s*Secret\s*$`)
 	slackBotTokenRe    = regexp.MustCompile(`xoxb-[0-9]{10,13}-[a-zA-Z0-9-]{24,}`)
 	jwtRe              = regexp.MustCompile(`eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+`)
 	bearerTokenRe      = regexp.MustCompile(`(?i)Bearer\s+[a-zA-Z0-9_.-]{20,}`)
 	basicAuthRe        = regexp.MustCompile(`(?i)Basic\s+[A-Za-z0-9+/=]{20,}`)
+	yamlExtRe          = regexp.MustCompile(`\.ya?ml$`)
 	inlineIgnoreMark   = "sentineld:ignore"
 )
 
@@ -158,6 +162,41 @@ func scanLine(path string, lineNo int, line string) []Finding {
 			Type:  "JWT Token",
 			Value: match,
 		})
+	}
+
+	// AWS STS session token
+	for _, match := range awsSTSTokenRe.FindAllString(line, -1) {
+		out = append(out, Finding{
+			File:  path,
+			Line:  lineNo,
+			Rule:  "aws_sts_token",
+			Type:  "AWS STS Session Token",
+			Value: match,
+		})
+	}
+
+	// GCP service account JSON
+	for _, match := range gcpServiceAccountRe.FindAllString(line, -1) {
+		out = append(out, Finding{
+			File:  path,
+			Line:  lineNo,
+			Rule:  "gcp_service_account",
+			Type:  "GCP Service Account Key",
+			Value: match,
+		})
+	}
+
+	// Kubernetes Secret YAML (only on .yaml/.yml files)
+	if yamlExtRe.MatchString(path) {
+		for _, match := range k8sSecretYAMLRe.FindAllString(line, -1) {
+			out = append(out, Finding{
+				File:  path,
+				Line:  lineNo,
+				Rule:  "k8s_secret_yaml",
+				Type:  "Kubernetes Secret (YAML)",
+				Value: match,
+			})
+		}
 	}
 
 	// Bearer token

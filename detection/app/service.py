@@ -1,10 +1,21 @@
 from __future__ import annotations
 
+import os
 from typing import Iterable, List
+
+from prometheus_client import Counter
 
 from .detectors import context as ctx
 from .detectors import regex_rules
 from .models import ScanRequest, ScanResultItem
+
+MIN_CONFIDENCE: float = float(os.getenv("SENTINEL_MIN_CONFIDENCE", "0.5"))
+
+_secrets_detected = Counter(
+    "secrets_detected_total",
+    "Total number of secrets detected",
+    ["rule_id"],
+)
 
 
 def scan_content(request: ScanRequest) -> List[ScanResultItem]:
@@ -26,7 +37,7 @@ def _scan_line(filename: str, line_no: int, line: str) -> List[ScanResultItem]:
 
     for rule in regex_rules.ALL_RULES:
         matches: Iterable[str]
-        matches = regex_rules.iter_rule_matches(rule, line)
+        matches = regex_rules.iter_rule_matches(rule, line, filename)
 
         # For generic high-entropy, post-filter by entropy and length.
         if rule.id == "high_entropy":
@@ -35,6 +46,9 @@ def _scan_line(filename: str, line_no: int, line: str) -> List[ScanResultItem]:
         for value in matches:
             base_conf = rule.base_confidence
             conf = adjust_confidence(base_conf, ctx_info, rule.id)
+            if conf < MIN_CONFIDENCE:
+                continue
+            _secrets_detected.labels(rule_id=rule.id).inc()
             results.append(
                 ScanResultItem(
                     line=line_no,
@@ -66,4 +80,3 @@ def adjust_confidence(base: float, ctx_info: ctx.ContextInfo, rule_id: str) -> f
     if score > 1.0:
         score = 1.0
     return score
-

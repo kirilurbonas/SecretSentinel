@@ -42,3 +42,6 @@ yarn-error.log*
 
 ### Docker
 *.pid
+
+### Environment / secrets
+.env

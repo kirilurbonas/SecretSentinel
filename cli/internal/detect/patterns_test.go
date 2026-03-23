@@ -126,6 +126,56 @@ func TestJWTPattern(t *testing.T) {
 	}
 }
 
+func TestAWSSTSTokenPattern(t *testing.T) {
+	// STS session tokens are >100 chars
+	token := "session_token=" + repeatStr("A", 110)
+	results := ScanFile("creds.go", []string{token}, map[int]struct{}{1: {}})
+	if !containsRule(results, "aws_sts_token") {
+		t.Fatalf("expected aws_sts_token finding")
+	}
+
+	// Too short — should not match
+	results2 := ScanFile("creds.go", []string{"session_token=short"}, map[int]struct{}{1: {}})
+	if containsRule(results2, "aws_sts_token") {
+		t.Fatalf("did not expect aws_sts_token for short value")
+	}
+}
+
+func TestGCPServiceAccountPattern(t *testing.T) {
+	line := `"type": "service_account"`
+	results := ScanFile("sa.json", []string{line}, map[int]struct{}{1: {}})
+	if !containsRule(results, "gcp_service_account") {
+		t.Fatalf("expected gcp_service_account finding")
+	}
+
+	line2 := `"type": "user"`
+	results2 := ScanFile("sa.json", []string{line2}, map[int]struct{}{1: {}})
+	if containsRule(results2, "gcp_service_account") {
+		t.Fatalf("did not expect gcp_service_account for user type")
+	}
+}
+
+func TestK8sSecretYAMLPattern(t *testing.T) {
+	line := "kind: Secret"
+	// Should match on .yaml files
+	results := ScanFile("manifest.yaml", []string{line}, map[int]struct{}{1: {}})
+	if !containsRule(results, "k8s_secret_yaml") {
+		t.Fatalf("expected k8s_secret_yaml finding on .yaml file")
+	}
+
+	// Should NOT match on non-yaml files
+	results2 := ScanFile("config.go", []string{line}, map[int]struct{}{1: {}})
+	if containsRule(results2, "k8s_secret_yaml") {
+		t.Fatalf("did not expect k8s_secret_yaml on .go file")
+	}
+
+	// Deployment should not match
+	results3 := ScanFile("manifest.yaml", []string{"kind: Deployment"}, map[int]struct{}{1: {}})
+	if containsRule(results3, "k8s_secret_yaml") {
+		t.Fatalf("did not expect k8s_secret_yaml for kind: Deployment")
+	}
+}
+
 func containsRule(findings []Finding, ruleID string) bool {
 	for _, f := range findings {
 		if f.Rule == ruleID {
@@ -133,5 +183,13 @@ func containsRule(findings []Finding, ruleID string) bool {
 		}
 	}
 	return false
+}
+
+func repeatStr(s string, n int) string {
+	result := make([]byte, 0, len(s)*n)
+	for i := 0; i < n; i++ {
+		result = append(result, s...)
+	}
+	return string(result)
 }
 

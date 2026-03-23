@@ -24,9 +24,16 @@ export const typeDefs = `#graphql
     secret(env: String!, key: String!): SecretValue
   }
 
+  type ValidationResult {
+    live: Boolean
+    checkedAt: String!
+    error: String
+  }
+
   type Mutation {
     scan(content: String!, filename: String): ScanResult
     setSecret(env: String!, key: String!, value: String!): String
     rotateSecret(env: String!, key: String!): String
+    validateSecret(type: String!, value: String!): ValidationResult
   }
 `;
