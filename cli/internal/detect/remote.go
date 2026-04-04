@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	internalgit "github.com/sentineldev/secretsentinel/cli/internal/git"
@@ -234,52 +235,31 @@ func MergeFindings(local, remote []Finding) []Finding {
 // normalizeRemoteType maps remote "type" strings to approximate internal rule IDs.
 func normalizeRemoteType(t string) string {
 	switch {
-	case contains(t, "AWS Access Key"):
+	case strings.Contains(t, "AWS Access Key"):
 		return "aws_access_key"
-	case contains(t, "AWS Secret"):
+	case strings.Contains(t, "AWS Secret"):
 		return "aws_secret_key"
-	case contains(t, "GitHub Personal Access Token"):
+	case strings.Contains(t, "GitHub Personal Access Token"):
 		return "github_pat"
-	case contains(t, "Stripe Secret"):
+	case strings.Contains(t, "Stripe Secret"):
 		return "stripe_secret"
-	case contains(t, "Private Key"):
+	case strings.Contains(t, "Private Key"):
 		return "private_key"
-	case contains(t, "Database URL"):
+	case strings.Contains(t, "Database URL"):
 		return "database_url"
-	case contains(t, "High-Entropy"):
+	case strings.Contains(t, "High-Entropy"):
 		return "high_entropy"
-	case contains(t, "Google API Key"):
+	case strings.Contains(t, "Google API Key"):
 		return "google_api_key"
-	case contains(t, "Slack"):
+	case strings.Contains(t, "Slack"):
 		return "slack_bot_token"
-	case contains(t, "JWT"):
+	case strings.Contains(t, "JWT"):
 		return "jwt"
-	case contains(t, "Bearer"):
+	case strings.Contains(t, "Bearer"):
 		return "bearer_token"
-	case contains(t, "Basic Auth"):
+	case strings.Contains(t, "Basic Auth"):
 		return "basic_auth"
 	default:
 		return "remote"
 	}
-}
-
-func contains(s, sub string) bool {
-	if len(sub) == 0 {
-		return false
-	}
-	return indexOf(s, sub) >= 0
-}
-
-// indexOf is a simple substring search.
-func indexOf(s, sub string) int {
-outer:
-	for i := 0; i+len(sub) <= len(s); i++ {
-		for j := 0; j < len(sub); j++ {
-			if s[i+j] != sub[j] {
-				continue outer
-			}
-		}
-		return i
-	}
-	return -1
 }

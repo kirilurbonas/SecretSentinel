@@ -9,6 +9,7 @@ with its upstream provider. Returns (live: bool | None, error: str | None).
 """
 from __future__ import annotations
 
+import json
 import urllib.error
 import urllib.request
 from typing import Tuple
@@ -19,22 +20,16 @@ LiveResult = Tuple["bool | None", "str | None"]
 def _check_aws(value: str) -> LiveResult:
     """
     Validate an AWS credential by calling STS GetCallerIdentity.
-    Expects value to be an access key ID (AKIA...) OR a JSON blob containing it.
+    Expects value to be a JSON blob containing accessKeyId and secretAccessKey.
     """
     try:
-        import boto3  # type: ignore[import-untyped]
-        import botocore.exceptions  # type: ignore[import-untyped]
-
-        # If value looks like an access key ID, we can't derive the secret key here.
-        # The validator is most useful when called with the full credential JSON.
-        import json
+        import boto3  # type: ignore[import-untyped,import-not-found]
 
         try:
             creds = json.loads(value)
             access_key = creds.get("accessKeyId") or creds.get("AccessKeyId")
             secret_key = creds.get("secretAccessKey") or creds.get("SecretAccessKey")
         except (json.JSONDecodeError, AttributeError):
-            # Plain access key ID — we can't call STS without the secret key.
             return None, "provide full JSON credential to validate AWS keys"
 
         if not access_key or not secret_key:

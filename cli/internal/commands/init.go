@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 // RunInit installs or updates the Git pre-commit hook to call `sentineld scan --staged`.
@@ -61,27 +62,7 @@ func findGitRoot() (string, error) {
 }
 
 func containsSentineldScan(data []byte) bool {
-	return stringContains(string(data), "sentineld scan --staged")
-}
-
-func stringContains(s, sub string) bool {
-	return len(sub) > 0 && len(s) >= len(sub) && (func() bool {
-		return indexOf(s, sub) >= 0
-	})()
-}
-
-// indexOf is a minimal substring search to avoid pulling in extra dependencies.
-func indexOf(s, sub string) int {
-outer:
-	for i := 0; i+len(sub) <= len(s); i++ {
-		for j := 0; j < len(sub); j++ {
-			if s[i+j] != sub[j] {
-				continue outer
-			}
-		}
-		return i
-	}
-	return -1
+	return strings.Contains(string(data), "sentineld scan --staged")
 }
 
 func buildPreCommitHookScript() string {

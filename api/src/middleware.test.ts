@@ -63,9 +63,9 @@ describe("authMiddleware", () => {
     expect(res.status).toBe(401);
   });
 
-  it("accepts opaque non-JWT bearer token without rejecting", async () => {
+  it("rejects opaque non-JWT bearer tokens (must be 3-part JWT)", async () => {
     const res = await request(app).get("/me").set("Authorization", "Bearer opaque-token-no-dots");
-    expect(res.status).toBe(200);
-    expect(res.body.userId).toBe("bearer");
+    expect(res.status).toBe(401);
+    expect(res.body.error).toBe("invalid token format");
   });
 });

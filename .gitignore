@@ -27,6 +27,8 @@ __pycache__/
 env/
 venv/
 .venv/
+*.egg-info/
+uv.lock
 
 ### Node / JavaScript / TypeScript
 npm-debug.log*

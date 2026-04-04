@@ -8,7 +8,7 @@ client = TestClient(app)
 
 
 def test_scan_detects_aws_access_key() -> None:
-    aws_key = "AKIA" + "1234567890ABCD"
+    aws_key = "AKIA" + "1234567890ABCDEF"
     payload = {
         "content": aws_key,
         "filename": "config.go",

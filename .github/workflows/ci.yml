@@ -7,6 +7,7 @@ on:
     branches: [main]
 
 jobs:
+  # ── Go CLI ──────────────────────────────────────────────────────────────────
   cli:
     name: CLI (Go)
     runs-on: ubuntu-latest
@@ -15,15 +16,22 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.22"
-      - name: Run tests
+      - name: Run tests with coverage
         run: |
           cd cli && go test -cover -coverprofile=coverage.out ./...
+          go tool cover -func=coverage.out | tail -1
       - name: Run golangci-lint
         uses: golangci/golangci-lint-action@v4
         with:
           version: latest
           working-directory: cli
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: cli-coverage
+          path: cli/coverage.out
 
+  # ── Detection (Python) ──────────────────────────────────────────────────────
   detection:
     name: Detection (Python)
     runs-on: ubuntu-latest
@@ -33,15 +41,20 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: |
-          cd detection && pip install -e ".[dev]"
+        run: cd detection && pip install -e ".[dev]"
       - name: Ruff
         run: cd detection && ruff check app/
       - name: Mypy
         run: cd detection && mypy app/
-      - name: Pytest
-        run: cd detection && pytest tests/ -v
+      - name: Pytest with coverage
+        run: cd detection && pytest tests/ -v --cov=app --cov-report=xml --cov-fail-under=60
+      - name: Upload coverage
+        uses: actions/upload-artifact@v4
+        with:
+          name: detection-coverage
+          path: detection/coverage.xml
 
+  # ── Vault (Node.js) ─────────────────────────────────────────────────────────
   vault-test:
     name: Vault (Node.js)
     runs-on: ubuntu-latest
@@ -52,6 +65,8 @@ jobs:
           node-version: "22"
       - name: Install dependencies
         run: cd vault && npm install
+      - name: Type check
+        run: cd vault && npx tsc --noEmit
       - name: Run tests
         run: cd vault && npm test
         env:
@@ -59,6 +74,7 @@ jobs:
           VAULT_ENCRYPTION_KEY: test-vault-encryption-key
           DATABASE_URL: ""
 
+  # ── API Gateway (Node.js) ───────────────────────────────────────────────────
   api-test:
     name: API Gateway (Node.js)
     runs-on: ubuntu-latest
@@ -69,33 +85,93 @@ jobs:
           node-version: "22"
       - name: Install dependencies
         run: cd api && npm install
+      - name: Type check
+        run: cd api && npx tsc --noEmit
       - name: Run tests
         run: cd api && npm test
         env:
           JWT_SECRET: test-jwt-secret-for-ci
 
+  # ── Rotation (Node.js) ──────────────────────────────────────────────────────
+  rotation-test:
+    name: Rotation Worker (Node.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        run: cd rotation && npm install
+      - name: Type check
+        run: cd rotation && npx tsc --noEmit
+      - name: Run tests
+        run: cd rotation && npm test
+        env:
+          VAULT_AUTH_SECRET: test-vault-auth-secret
+
+  # ── Vault SDK (Node.js) ─────────────────────────────────────────────────────
+  sdk-test:
+    name: Vault SDK (Node.js)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        run: cd vault/sdk && npm install
+      - name: Type check
+        run: cd vault/sdk && npx tsc --noEmit
+
+  # ── Dashboard (Node.js) ─────────────────────────────────────────────────────
+  dashboard-build:
+    name: Dashboard (React)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        run: cd dashboard && npm install
+      - name: Type check
+        run: cd dashboard && npx tsc --noEmit
+      - name: Run tests
+        run: cd dashboard && npm test
+      - name: Build
+        run: cd dashboard && npm run build
+
+  # ── Build artifacts ─────────────────────────────────────────────────────────
   build:
     name: Build
     runs-on: ubuntu-latest
-    needs: [cli, detection, vault-test, api-test]
+    needs: [cli, detection, vault-test, api-test, rotation-test, sdk-test, dashboard-build]
     steps:
       - uses: actions/checkout@v4
-      - name: Build CLI
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+      - name: Build CLI binary
         run: |
-          cd cli && CGO_ENABLED=0 go build -o sentineld ./cmd/sentineld
-      - name: Build detection image
-        run: docker build -t secretsentinel-detection:latest ./detection
-      - name: Build vault image
-        run: docker build -t secretsentinel-vault:latest ./vault
+          cd cli && CGO_ENABLED=0 go build -ldflags="-s -w" -o ../bin/sentineld ./cmd/sentineld
 
+  # ── Security scanning ────────────────────────────────────────────────────────
   security:
     name: Security Scanning
     runs-on: ubuntu-latest
-    needs: [build]
+    needs: [cli, detection, vault-test, api-test]
     permissions:
       security-events: write
     steps:
       - uses: actions/checkout@v4
+
+      - name: Build detection image
+        run: docker build -t secretsentinel-detection:latest ./detection
+
+      - name: Build vault image
+        run: docker build -t secretsentinel-vault:latest ./vault
+
       - name: Run Trivy on detection image
         uses: aquasecurity/trivy-action@master
         with:
@@ -104,6 +180,7 @@ jobs:
           output: trivy-detection.sarif
           exit-code: "1"
           severity: CRITICAL,HIGH
+
       - name: Run Trivy on vault image
         uses: aquasecurity/trivy-action@master
         with:
@@ -112,15 +189,18 @@ jobs:
           output: trivy-vault.sarif
           exit-code: "1"
           severity: CRITICAL,HIGH
+
       - name: Upload Trivy SARIF results
         uses: github/codeql-action/upload-sarif@v3
         if: always()
         with:
           sarif_file: "."
+
       - name: Run gitleaks secret scan
         uses: gitleaks/gitleaks-action@v2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Generate SBOM for detection image
         uses: anchore/sbom-action@v0
         with:

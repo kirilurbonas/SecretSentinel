@@ -14,7 +14,9 @@
     "@apollo/server": "^4.11.0",
     "cors": "^2.8.5",
     "express": "^4.21.0",
-    "graphql": "^16.9.0"
+    "express-rate-limit": "^7.0.0",
+    "graphql": "^16.9.0",
+    "prom-client": "^15.0.0"
   },
   "devDependencies": {
     "@types/cors": "^2.8.17",

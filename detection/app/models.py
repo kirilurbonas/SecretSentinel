@@ -6,8 +6,8 @@ from pydantic import BaseModel, Field
 
 
 class ScanRequest(BaseModel):
-    content: str = Field(..., description="File content to scan")
-    filename: str = Field(..., description="Logical filename (for context)")
+    content: str = Field(..., description="File content to scan", max_length=1_000_000)
+    filename: str = Field(..., description="Logical filename (for context)", max_length=4096)
 
 
 class ScanResultItem(BaseModel):
@@ -35,7 +35,9 @@ class BatchScanResponse(BaseModel):
 
 
 class ValidateRequest(BaseModel):
-    type: str = Field(..., description="Rule ID or type string (e.g. 'aws_access_key', 'github_pat')")
+    type: str = Field(
+        ..., description="Rule ID or type string (e.g. 'aws_access_key', 'github_pat')"
+    )
     value: str = Field(..., description="The secret value to validate")
 
 

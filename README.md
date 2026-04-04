@@ -1,180 +1,251 @@
-## SecretSentinel
+# SecretSentinel
 
-SecretSentinel is a developer-first secrets security platform designed to prevent credentials (API keys, tokens, passwords, database URLs, and private keys) from leaking into source code and version control.
+Enterprise-grade secrets security platform: developer pre-commit protection, automated detection, encrypted vault, rotation, and observability.
 
-The system combines a pre-commit hook CLI (`sentineld`), a detection engine, a secrets vault, an automated rotation worker, and an API gateway — all production-hardened and ready to deploy.
+## Architecture
 
----
+```mermaid
+graph TB
+    subgraph devEnv [Developer Environment]
+        CLI["sentineld CLI (Go)"]
+        Hook["git pre-commit hook"]
+    end
 
-### Monorepo structure
+    subgraph platform [SecretSentinel Platform]
+        APIGateway["API Gateway\n(Express + GraphQL)\n:4000"]
+        Detection["Detection Service\n(FastAPI)\n:8000"]
+        Vault["Vault Service\n(Express + PostgreSQL)\n:3000"]
+        Rotation["Rotation Worker\n(Node.js + SQS)"]
+        Dashboard["Dashboard\n(React + nginx)\n:8080"]
+        DB["PostgreSQL 16\n:5432"]
+    end
 
-| Directory | Description |
-|-----------|-------------|
-| `cli/` | Go 1.22 CLI (`sentineld`) — pre-commit hook, path scanning, JSON output |
-| `detection/` | Python 3.12 FastAPI detection microservice — regex, entropy, context scoring |
-| `vault/` | Node.js 22 Vault HTTP API + `@sentineldev/sdk` — AES-256-GCM encrypted, Postgres-backed |
-| `rotation/` | Node.js 22 rotation worker — polls AWS SQS, rotates secrets via Vault |
-| `api/` | API gateway — GraphQL + REST proxy, HMAC-SHA256 JWT auth, CORS |
-| `dashboard/` | React 19 + TypeScript + Tailwind — login, secrets list, add/rotate UI |
-| `shared/` | Shared types and protocol definitions |
-| `infra/` | Docker Compose (full stack) and Terraform stubs for AWS ECS Fargate |
+    subgraph external [External]
+        SQS["AWS SQS"]
+        Providers["Secret Providers\n(AWS IAM, Generic)"]
+    end
 
----
+    Hook --> CLI
+    CLI -->|"local regex + entropy"| CLI
+    CLI -->|"/scan/batch"| Detection
 
-### Quick start (full stack)
+    Dashboard --> APIGateway
+    APIGateway -->|proxy| Detection
+    APIGateway -->|proxy| Vault
+
+    Vault --> DB
+    Vault --> Providers
+    Rotation -->|"PUT /rotate"| Vault
+    Rotation --> SQS
+```
+
+## Monorepo Layout
+
+| Path | Service | Language |
+|------|---------|----------|
+| `cli/` | `sentineld` CLI — git pre-commit scanner | Go 1.22 |
+| `detection/` | Detection microservice — regex, entropy, confidence | Python 3.12 / FastAPI |
+| `vault/` | Vault service — AES-256-GCM encrypted secret store | Node 22 / Express |
+| `vault/sdk/` | `@sentineldev/sdk` — fetch/inject secrets from vault | TypeScript |
+| `api/` | API gateway — REST + GraphQL proxy, JWT auth | Node 22 / Express + Apollo |
+| `rotation/` | Rotation worker — SQS-triggered secret rotation | Node 22 |
+| `dashboard/` | Management UI | React 19 / Vite / Tailwind |
+| `infra/` | Docker Compose stacks + Terraform stubs | — |
+
+## Quick Start (Development)
 
 ```bash
-# 1. Copy and fill in required secrets
 cp .env.example .env
+# Fill in POSTGRES_PASSWORD, VAULT_AUTH_SECRET, VAULT_ENCRYPTION_KEY, JWT_SECRET
 
-# 2. Start all services
 cd infra && docker compose up -d
 ```
 
-Services started: **detection** (8000) · **vault** (3000) · **api** (4000) · **rotation** (worker) · **dashboard** (8080) · **db** (5432)
+Services start on:
 
-All containers include health checks and start in dependency order. The dashboard proxies `/api` and `/graphql` to the API gateway (`vite.config.ts`); in production, set the dashboard's `VITE_API_URL` to your API gateway host.
+| Service | URL |
+|---------|-----|
+| Dashboard | http://localhost:8080 |
+| API Gateway | http://localhost:4000 |
+| Detection | http://localhost:8000 |
+| Vault | http://localhost:3000 |
+| PostgreSQL | localhost:5432 |
 
----
+## Production Deployment
 
-### Required environment variables
+```bash
+cp .env.example .env   # fill in all required secrets
+cd infra && docker compose -f docker-compose.prod.yml up -d
+```
 
-See `.env.example` for the full list. Key variables:
+The production compose includes all six services with:
+- Resource limits (CPU + memory) per service
+- Network isolation (frontend / backend networks)
+- Structured JSON logging via Docker json-file driver with rotation
+- Deep health checks (vault verifies DB connectivity)
+- Graceful shutdown (SIGTERM handlers on all Node services)
+
+### Production Checklist
+
+- [ ] TLS termination via reverse proxy (nginx/Caddy) in front of port 4000 and 8080
+- [ ] Set strong values for `POSTGRES_PASSWORD`, `VAULT_AUTH_SECRET`, `VAULT_ENCRYPTION_KEY`, `JWT_SECRET`
+- [ ] Configure `ALLOWED_ORIGINS` to your actual frontend domain
+- [ ] Set `SQS_ROTATION_QUEUE_URL` if using secret rotation
+- [ ] Configure PostgreSQL backups (e.g. pg_dump cron or AWS RDS automated backups)
+- [ ] Set up Prometheus scraping on `/metrics` endpoints (vault :3000, API :4000, rotation :9090)
+- [ ] Enable `SENTINEL_ENABLE_VALIDATION=1` only if network egress to providers is allowed
+
+## Environment Variables
+
+### Required
 
 | Variable | Used by | Description |
-|---|---|---|
-| `POSTGRES_PASSWORD` | db, vault | Postgres root password |
-| `VAULT_AUTH_SECRET` | vault, rotation | HMAC secret for signing vault auth tokens |
-| `VAULT_ENCRYPTION_KEY` | vault | Key for AES-256-GCM secret encryption at rest |
-| `JWT_SECRET` | api | HMAC-SHA256 JWT verification secret |
-| `ALLOWED_ORIGINS` | api | Comma-separated CORS origin allowlist |
-| `SENTINEL_CLI_TOKEN` | cli | Bearer token for authenticated API calls |
-| `SQS_ROTATION_QUEUE_URL` | rotation | AWS SQS queue for rotation jobs |
+|----------|---------|-------------|
+| `POSTGRES_PASSWORD` | vault, db | PostgreSQL password |
+| `VAULT_AUTH_SECRET` | vault, rotation | HMAC secret for tenant auth tokens |
+| `VAULT_ENCRYPTION_KEY` | vault | AES-256-GCM key for at-rest encryption |
+| `JWT_SECRET` | api | HMAC-SHA256 secret for verifying JWTs |
 
----
+### Optional
 
-### CLI
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `ALLOWED_ORIGINS` | `http://localhost:8080` | CORS allowed origins (comma-separated) |
+| `SENTINEL_CLI_TOKEN` | — | Bearer token CLI sends to detection service |
+| `SENTINEL_DETECTION_URL` | — | Detection service URL for CLI remote scan |
+| `SENTINEL_MIN_CONFIDENCE` | `0.5` | Minimum confidence threshold (0.0–1.0) |
+| `SENTINEL_DISABLED_RULES` | — | Comma-separated rule IDs to disable |
+| `SENTINEL_ENABLE_VALIDATION` | — | Set to `1` to enable live secret validation |
+| `SQS_ROTATION_QUEUE_URL` | — | SQS queue URL for rotation events |
+| `AWS_REGION` | `us-east-1` | AWS region for SQS/IAM |
+
+## CLI Usage
 
 ```bash
-# Install pre-commit hook in a repo
+# Install pre-commit hook in current git repo
 sentineld init
 
-# Scan staged changes (runs automatically on git commit)
+# Scan staged changes (called automatically by pre-commit hook)
 sentineld scan --staged
 
-# Scan a directory (CI usage)
+# Scan a directory
 sentineld scan --path ./src
 
-# Machine-readable output
-sentineld scan --path ./src --json
+# Scan with JSON output (for CI)
+sentineld scan --path . --json
 
-# Authenticated scan via API gateway
-sentineld scan --staged --auth-token $SENTINEL_CLI_TOKEN
-# or set SENTINEL_CLI_TOKEN env var
+# Use remote detection service
+SENTINEL_DETECTION_URL=http://localhost:8000 sentineld scan --staged
 ```
 
-Set `SENTINEL_DETECTION_URL` (e.g. `http://localhost:8000`) to route scans through the detection service. Set `SENTINEL_REMOTE_TIMEOUT_SECONDS` (default 30, max 300) to control request timeout.
+Inline ignore: append `# sentineld:ignore` to any line to suppress findings for that line.
 
-#### Build the CLI
+## Detection API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health status with rule count |
+| `/ready` | GET | Readiness probe |
+| `/scan` | POST | Scan a single file's content |
+| `/scan/batch` | POST | Scan multiple files in one request |
+| `/validate` | POST | Check if a secret is still live |
+| `/metrics` | GET | Prometheus metrics |
+
+**Rate limits:** `/scan` 100/min, `/scan/batch` 50/min, `/validate` 20/min (per IP).
+
+## Vault API
+
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/health` | GET | Health + DB connectivity check |
+| `/ready` | GET | Readiness probe |
+| `/metrics` | GET | Prometheus metrics |
+| `/secrets/:env` | GET | List secret keys for env |
+| `/secrets/:env` | POST | Create/update a secret |
+| `/secrets/:env/:key` | GET | Read a secret value |
+| `/secrets/:env/:key` | DELETE | Delete a secret |
+| `/secrets/:env/:key/rotate` | PUT | Rotate a secret |
+| `/secrets/:env/:key/versions` | GET | List secret version history |
+| `/audit/:env` | GET | Retrieve audit log for env |
+
+Authentication: `Authorization: Bearer <tenant>.<HMAC-SHA256-sig>` or `X-Sentinel-Token`.
+
+## API Gateway (REST + GraphQL)
+
+REST proxy: `/api/scan`, `/api/validate` → detection; `/api/vault/*` → vault  
+GraphQL: `POST /graphql` — schema covers `scan`, `secretKeys`, `secret`, `setSecret`, `rotateSecret`, `validateSecret`
+
+Authentication: `Authorization: Bearer <JWT>` (HMAC-SHA256, signed with `JWT_SECRET`).
+
+## SDK Usage
+
+```typescript
+import { SecretSentinel } from "@sentineldev/sdk";
+
+const sentinel = new SecretSentinel({
+  token: process.env.SENTINEL_TOKEN,
+  baseUrl: process.env.SENTINEL_VAULT_URL,
+});
+
+// Fetch a single secret
+const apiKey = await sentinel.get("STRIPE_API_KEY", { env: "prod" });
+
+// Inject multiple secrets into process.env
+await sentinel.inject(["DB_PASSWORD", "REDIS_URL"], { env: "prod" });
+```
+
+## Observability
+
+Each service exposes `/metrics` (Prometheus format):
+
+| Service | Metrics endpoint |
+|---------|-----------------|
+| Detection | `:8000/metrics` |
+| Vault | `:3000/metrics` |
+| API Gateway | `:4000/metrics` |
+| Rotation | `:9090/metrics` |
+
+Key metrics: `secrets_detected_total`, `vault_secret_operations_total`, `vault_http_request_duration_seconds`, `api_gateway_proxy_errors_total`, `rotation_successes_total`, `rotation_failures_total`.
+
+## CI Pipeline
+
+GitHub Actions jobs: `cli` → `detection` → `vault-test` → `api-test` → `rotation-test` → `sdk-test` → `dashboard-build` → `build` → `security`
+
+Security job: Trivy image scanning (CRITICAL/HIGH CVEs), gitleaks, SBOM generation.
+
+## Development
 
 ```bash
-make build-cli    # outputs bin/sentineld
+# CLI tests
+cd cli && go test -cover ./...
+
+# Detection tests + lint
+cd detection && pip install -e ".[dev]" && ruff check app/ && mypy app/ && pytest tests/ -v
+
+# Vault tests
+cd vault && npm install && npm test
+
+# API tests
+cd api && npm install && npm test
+
+# Rotation tests
+cd rotation && npm install && npm test
+
+# Dashboard tests
+cd dashboard && npm install && npm test
+
+# Build CLI binary
+make build-cli
 ```
 
----
+## Troubleshooting
 
-### Detection service
+**Vault fails to start:** Ensure `POSTGRES_PASSWORD`, `VAULT_AUTH_SECRET`, and `VAULT_ENCRYPTION_KEY` are set.
 
-`POST /scan` · `POST /scan/batch` · `POST /validate` · `GET /health` · `GET /metrics`
+**Detection returns 422:** Content exceeds 1 MB limit or filename exceeds 4096 bytes.
 
-The service combines:
-- **50+ regex rules** covering AWS, GitHub, Stripe, Slack, GCP, Azure, Kubernetes, and more
-- **Shannon entropy** scoring to catch generic high-entropy strings
-- **Context-aware scoring** — confidence is reduced for values found in test files, example files, or comment lines
-- **Filename-filtered rules** — e.g. the Kubernetes Secret rule only fires on `.yaml`/`.yml` files
-- **Confidence threshold** — findings below `SENTINEL_MIN_CONFIDENCE` (default `0.5`) are suppressed
-- **Secret liveness validation** — `POST /validate` checks if a detected credential is still active (AWS via STS `GetCallerIdentity`, GitHub via `/user` API)
-- **Prometheus metrics** at `/metrics` — request counts, latency histograms, per-rule detection counters
+**API Gateway returns 429:** Rate limit exceeded (200 req/min per IP). Configurable via code.
 
----
+**Rotation worker is idle:** `SQS_ROTATION_QUEUE_URL` not set — worker runs in stub mode.
 
-### Vault service & SDK
-
-**Vault** (`vault/`) is a Node.js 22 HTTP API providing encrypted secret storage:
-
-- Secrets are encrypted with **AES-256-GCM** before being written to Postgres (key derived via `scrypt`)
-- Auth tokens are **HMAC-SHA256 signed** and verified with constant-time comparison
-- Supports **per-tenant secret namespacing**
-- Routes: `GET/POST /secrets/:env/:key` · `GET /secrets/:env` · `PUT /secrets/:env/:key/rotate`
-
-**SDK** (`vault/sdk/`) — `@sentineldev/sdk`:
-
-```ts
-import { SentinelClient } from "@sentineldev/sdk";
-const client = new SentinelClient({ env: "production" });
-const secret = await client.get("DATABASE_URL");
-const injected = await client.inject(["DB_PASS", "API_KEY"]);
-```
-
-Features: 5-minute local cache, `SentinelSecretNotFoundError` on missing keys.
-
----
-
-### Rotation worker
-
-The rotation worker (`rotation/`) polls an AWS SQS queue for rotation jobs and calls the Vault API to rotate secrets. Production features:
-
-- **Exponential backoff** — failed messages are delayed `2^attempt` seconds (up to `MAX_ROTATION_RETRIES`, default 5) before being dead-lettered
-- **AWS IAM key rotation** — creates a new IAM access key, then deletes the old one
-- **Generic rotation** — generates a cryptographically random 48-byte base64url secret for non-IAM keys
-- **Health file** — writes `/tmp/sentinel-alive` on every successful SQS poll (used by Docker health check)
-- **Vault auth** — generates signed vault tokens using `VAULT_AUTH_SECRET`
-
----
-
-### API gateway
-
-The API gateway (`api/`) is a Fastify service providing:
-
-- **HMAC-SHA256 JWT verification** — validates tokens using `JWT_SECRET`, rejects tampered JWTs with 401
-- **CORS restriction** — only origins listed in `ALLOWED_ORIGINS` are allowed
-- **GraphQL API** — `query { secrets }`, `mutation { storeSecret }`, `mutation { rotateSecret }`, `mutation { validateSecret(type, value) }`
-- **REST proxy** — `/api/scan` and `/api/validate` forwarded to the detection service
-- **Structured JSON logging** on every request
-
----
-
-### CI/CD pipeline
-
-`.github/workflows/ci.yml` runs on every push and pull request:
-
-| Job | What it does |
-|-----|-------------|
-| `test-go` | `go test ./... -race -coverprofile=coverage.out` |
-| `test-python` | `pytest tests/ -v` (104 parametrized rule tests + context tests) |
-| `vault-test` | `npm test` (crypto + auth unit tests via Vitest) |
-| `api-test` | `npm test` (middleware JWT tests via Vitest + Supertest) |
-| `build` | Builds Docker images for detection and vault |
-| `security` | Trivy container scanning (SARIF upload), gitleaks secret scanning, SBOM generation via Syft |
-
----
-
-### Production deployment
-
-```bash
-# Build detection image
-make build-detection
-
-# Run detection in production mode (4 Gunicorn workers)
-make up-prod
-
-# Or bring up the full stack
-cd infra && docker compose up -d
-```
-
-All Docker Compose services include:
-- `healthcheck` blocks (HTTP probe or file existence)
-- `depends_on: condition: service_healthy` — services wait for dependencies to be ready before starting
-- No hardcoded credentials — all secrets injected via environment variables
-
-For cloud deployment, Terraform stubs for AWS ECS Fargate are in `infra/terraform/`.
+**CLI scan slow:** `SENTINEL_DETECTION_URL` is set but service is unreachable; scan falls back to local detection only after 30s timeout. Set `SENTINEL_REMOTE_TIMEOUT_SECONDS=5` for faster fallback.

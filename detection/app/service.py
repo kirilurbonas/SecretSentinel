@@ -11,11 +11,23 @@ from .models import ScanRequest, ScanResultItem
 
 MIN_CONFIDENCE: float = float(os.getenv("SENTINEL_MIN_CONFIDENCE", "0.5"))
 
+# Comma-separated list of rule IDs to disable, e.g. "high_entropy,bearer_token"
+_DISABLED_RULES: set[str] = {
+    r.strip()
+    for r in os.getenv("SENTINEL_DISABLED_RULES", "").split(",")
+    if r.strip()
+}
+
 _secrets_detected = Counter(
     "secrets_detected_total",
     "Total number of secrets detected",
     ["rule_id"],
 )
+
+
+def active_rules() -> list[regex_rules.RegexRule]:
+    """Return rules that are not disabled via SENTINEL_DISABLED_RULES."""
+    return [r for r in regex_rules.ALL_RULES if r.id not in _DISABLED_RULES]
 
 
 def scan_content(request: ScanRequest) -> List[ScanResultItem]:
@@ -35,7 +47,7 @@ def _scan_line(filename: str, line_no: int, line: str) -> List[ScanResultItem]:
     ctx_info = ctx.build_context(filename, line)
     results: List[ScanResultItem] = []
 
-    for rule in regex_rules.ALL_RULES:
+    for rule in active_rules():
         matches: Iterable[str]
         matches = regex_rules.iter_rule_matches(rule, line, filename)
 
