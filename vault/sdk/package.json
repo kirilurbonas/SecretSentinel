@@ -19,7 +19,7 @@
     "prepublishOnly": "npm run build"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^25.5.2",
     "typescript": "^5.6.0"
   }
 }
