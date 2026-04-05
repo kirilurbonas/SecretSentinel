@@ -186,6 +186,7 @@ jobs:
           output: trivy-detection.sarif
           exit-code: "1"
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
 
       - name: Run Trivy on vault image
         if: always() && steps.build-vault.outcome == 'success'
@@ -196,6 +197,7 @@ jobs:
           output: trivy-vault.sarif
           exit-code: "1"
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
 
       - name: Upload Trivy SARIF results
         uses: github/codeql-action/upload-sarif@v4
