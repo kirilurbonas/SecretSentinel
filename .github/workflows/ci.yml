@@ -167,14 +167,18 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Build detection image
+        id: build-detection
+        continue-on-error: true
         run: docker build -t secretsentinel-detection:latest ./detection
 
       - name: Build vault image
+        id: build-vault
         if: always()
+        continue-on-error: true
         run: docker build -t secretsentinel-vault:latest ./vault
 
       - name: Run Trivy on detection image
-        if: always()
+        if: always() && steps.build-detection.outcome == 'success'
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: secretsentinel-detection:latest
@@ -184,7 +188,7 @@ jobs:
           severity: CRITICAL,HIGH
 
       - name: Run Trivy on vault image
-        if: always()
+        if: always() && steps.build-vault.outcome == 'success'
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: secretsentinel-vault:latest
@@ -195,9 +199,17 @@ jobs:
 
       - name: Upload Trivy SARIF results
         uses: github/codeql-action/upload-sarif@v4
-        if: always()
+        if: always() && (hashFiles('trivy-detection.sarif') != '' || hashFiles('trivy-vault.sarif') != '')
         with:
           sarif_file: "."
+
+      - name: Fail if any image build failed
+        if: always() && (steps.build-detection.outcome == 'failure' || steps.build-vault.outcome == 'failure')
+        run: |
+          echo "One or more Docker image builds failed:"
+          echo "  detection: ${{ steps.build-detection.outcome }}"
+          echo "  vault:     ${{ steps.build-vault.outcome }}"
+          exit 1
 
       - name: Run gitleaks secret scan
         uses: gitleaks/gitleaks-action@v2
