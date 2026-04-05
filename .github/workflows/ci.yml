@@ -170,9 +170,11 @@ jobs:
         run: docker build -t secretsentinel-detection:latest ./detection
 
       - name: Build vault image
+        if: always()
         run: docker build -t secretsentinel-vault:latest ./vault
 
       - name: Run Trivy on detection image
+        if: always()
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: secretsentinel-detection:latest
@@ -182,6 +184,7 @@ jobs:
           severity: CRITICAL,HIGH
 
       - name: Run Trivy on vault image
+        if: always()
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: secretsentinel-vault:latest
@@ -191,7 +194,7 @@ jobs:
           severity: CRITICAL,HIGH
 
       - name: Upload Trivy SARIF results
-        uses: github/codeql-action/upload-sarif@v3
+        uses: github/codeql-action/upload-sarif@v4
         if: always()
         with:
           sarif_file: "."
