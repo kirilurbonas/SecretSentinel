@@ -13,9 +13,9 @@ import (
 // JSONFinding is the shape emitted by PrintFindingsJSON for CI/scripts.
 type JSONFinding struct {
 	File  string `json:"file"`
-	Line  int    `json:"line"`
 	Type  string `json:"type"`
 	Value string `json:"value"`
+	Line  int    `json:"line"`
 }
 
 // PrintFindingsJSON prints findings as a JSON array of {file, line, type, value}.
@@ -37,7 +37,9 @@ func PrintFindingsJSON(findings []detect.Finding) {
 	}
 	enc := json.NewEncoder(os.Stdout)
 	enc.SetEscapeHTML(false)
-	_ = enc.Encode(out)
+	if err := enc.Encode(out); err != nil {
+		fmt.Fprintf(os.Stderr, "error encoding JSON output: %v\n", err)
+	}
 }
 
 // PrintFindings prints findings in the required SecretSentinel CLI format.
@@ -111,4 +113,3 @@ func vaultHint(key string) string {
 	}
 	return fmt.Sprintf("Move this to your SecretSentinel vault:\n       sentineld secret add %s --env dev", key)
 }
-

@@ -28,4 +28,3 @@ func ShannonEntropy(s string) float64 {
 	}
 	return entropy
 }
-

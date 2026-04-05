@@ -19,11 +19,11 @@ var ErrSecretsFound = errors.New("secrets detected in staged changes")
 
 // ScanFlags holds parsed scan command flags.
 type ScanFlags struct {
-	Staged       bool
 	Path         string
-	JSON         bool
 	DetectionURL string
 	AuthToken    string
+	Staged       bool
+	JSON         bool
 }
 
 // ParseScanArgs parses scan command arguments into ScanFlags.
@@ -183,7 +183,10 @@ func collectPathFiles(root string, matcher *ignore.Matcher) ([]string, error) {
 		if info.IsDir() {
 			return nil
 		}
-		rel, _ := filepath.Rel(root, path)
+		rel, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			rel = filepath.Base(path)
+		}
 		rel = filepath.ToSlash(rel)
 		if rel == "" {
 			rel = filepath.Base(path)
@@ -237,4 +240,3 @@ func printScanHelp() {
 func init() {
 	_ = os.Stdout
 }
-

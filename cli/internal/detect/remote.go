@@ -23,10 +23,10 @@ type batchRequest struct {
 }
 
 type batchFinding struct {
-	Line       int     `json:"line"`
 	Type       string  `json:"type"`
 	Value      string  `json:"value"`
 	Confidence float64 `json:"confidence"`
+	Line       int     `json:"line"`
 }
 
 type batchFileResult struct {

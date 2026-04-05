@@ -28,4 +28,3 @@ func TestShannonEntropyUnicode(t *testing.T) {
 		t.Fatalf("expected positive entropy for non-empty unicode string, got %f", got)
 	}
 }
-

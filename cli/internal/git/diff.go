@@ -12,8 +12,8 @@ import (
 
 // FileChange represents added lines in a staged file.
 type FileChange struct {
-	Path       string
 	AddedLines map[int]struct{}
+	Path       string
 }
 
 // StagedChanges returns added line numbers for each staged file based on
@@ -126,11 +126,7 @@ func parseNewFilePath(line string) string {
 	if fields[1] == "/dev/null" {
 		return ""
 	}
-	path := fields[1]
-	if strings.HasPrefix(path, "b/") {
-		path = path[2:]
-	}
-	return path
+	return strings.TrimPrefix(fields[1], "b/")
 }
 
 func parseNewHunkStart(line string) int {
@@ -153,4 +149,3 @@ func parseNewHunkStart(line string) int {
 	}
 	return n
 }
-

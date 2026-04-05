@@ -48,4 +48,3 @@ func printUsage() {
 	fmt.Println("  sentineld scan --help           Show scan options and SENTINEL_DETECTION_URL")
 	fmt.Println("  sentineld help                  Show this help message")
 }
-

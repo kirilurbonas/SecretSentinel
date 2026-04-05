@@ -14,9 +14,9 @@ type Matcher struct {
 }
 
 type pattern struct {
-	negate bool
 	re     *regexp.Regexp
 	raw    string
+	negate bool
 }
 
 // Load reads .sentinelignore from the nearest Git repository root, if present.
@@ -99,9 +99,7 @@ func (m *Matcher) Match(path string) bool {
 
 func globToRegexp(pattern string) (*regexp.Regexp, error) {
 	// Normalize leading slash to avoid double separators.
-	if strings.HasPrefix(pattern, "/") {
-		pattern = pattern[1:]
-	}
+	pattern = strings.TrimPrefix(pattern, "/")
 
 	var rx strings.Builder
 	rx.WriteString("^")
@@ -147,4 +145,3 @@ func findGitRoot() (string, error) {
 		dir = parent
 	}
 }
-
