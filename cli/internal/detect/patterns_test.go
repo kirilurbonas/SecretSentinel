@@ -3,7 +3,7 @@ package detect
 import "testing"
 
 func TestAWSAccessKeyPattern(t *testing.T) {
-	key := "AKIA" + "1234567890ABCD"
+	key := "AKIA" + "1234567890ABCDEF"
 	line := `key = "` + key + `"`
 	results := ScanFile("config.go", []string{line}, map[int]struct{}{1: {}})
 
@@ -20,7 +20,7 @@ func TestAWSAccessKeyPattern(t *testing.T) {
 
 func TestAWSSecretKeyPattern(t *testing.T) {
 	// Construct a 40-char base64-like string with reasonably high entropy.
-	secret := "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789AB"
+	secret := "AbCdEfGhIjKlMnOpQrStUvWxYz0123456789ABCD"
 	if len(secret) != 40 {
 		t.Fatalf("test secret length must be 40, got %d", len(secret))
 	}
