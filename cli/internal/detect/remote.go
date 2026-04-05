@@ -205,9 +205,9 @@ func RemoteScanBatchWithContent(baseURL string, files []PathContent, authToken s
 func MergeFindings(local, remote []Finding) []Finding {
 	type key struct {
 		file string
-		line int
 		typ  string
 		val  string
+		line int
 	}
 
 	seen := make(map[key]struct{})
