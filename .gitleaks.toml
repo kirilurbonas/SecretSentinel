@@ -1,0 +1,14 @@
+# SecretSentinel is a secret scanner: its tests and detector patterns contain
+# fake, intentionally secret-shaped strings. Allowlist those paths only.
+title = "SecretSentinel gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Fake secrets used as test fixtures and detector patterns"
+paths = [
+  '''^detection/tests/''',
+  '''^cli/internal/detect/.*_test\.go$''',
+  '''^detection/app/detectors/regex_rules\.py$''',
+]
